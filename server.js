@@ -29,7 +29,7 @@ if (!PAGE_ACCESS_TOKEN) {
 // ====== EDIT THESE LINKS ======
 const LINKS = {
   CLUB_PAGE: "https://facebook.com/YourClubPageUsername",
-  ABOUT_TEXT: "نبذة مختصرة عن التخصص: هذا التخصص يهتم بكذا وكذا... (عدّل النص)",
+  ABOUT_TEXT: "abdullah",
   ABOUT_VIDEO: "https://youtu.be/your_intro_video",
   PAY_GROUPS: [
     { title: "مجموعة الدفع 2024/2025", url: "https://m.me/j/EXAMPLE1" },
