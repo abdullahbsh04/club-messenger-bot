@@ -1,4 +1,3 @@
-
 /**
  * Simple Messenger Bot for a university club
  * - Supports webhook verification
@@ -200,7 +199,7 @@ function handlePostback(sender_psid, postback) {
 async function handlePayload(sender_psid, payload) {
   switch (payload) {
     case "GET_STARTED":
-      await callSendAPI(sender_psid, { text: "أهلاً وسهلاً بك 👋" });
+      await callSendAPI(sender_psid, { text: "أهلاً بك في نادي هندسة الأتمتة الصناعية نحن هنا لمساعدتك" });
       return callSendAPI(sender_psid, mainMenuQuickReplies());
     case "ABOUT": return sendAbout(sender_psid);
     case "CONTACT": return sendContact(sender_psid);
@@ -246,43 +245,4 @@ async function sendPayGroups(sender_psid) {
 
 async function sendCourseGroups(sender_psid) {
   if (!LINKS.COURSE_GROUPS || LINKS.COURSE_GROUPS.length === 0) {
-    return callSendAPI(sender_psid, { text: "لا توجد مجموعات مواد حالياً." });
-  }
-  for (const g of LINKS.COURSE_GROUPS) {
-    await callSendAPI(sender_psid, { text: `${g.title}: ${g.url}` });
-  }
-}
-
-async function sendCourses(sender_psid) {
-  // build quick replies with courses
-  const items = Object.keys(COURSES).slice(0, 11); // limit to 11 quick replies
-  if (items.length === 0) {
-    return callSendAPI(sender_psid, { text: "أضف أسماء المواد وربطها في الكود أولاً." });
-  }
-  const qrs = items.map(name => ({
-    content_type: "text",
-    title: name.slice(0, 20),
-    payload: `COURSE::${name}`
-  }));
-  return callSendAPI(sender_psid, {
-    text: "اختر المادة لعرض رابط الدرايف:",
-    quick_replies: qrs
-  });
-}
-
-// Core send function
-async function callSendAPI(psid, message) {
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v19.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-      {
-        recipient: { id: psid },
-        message
-      }
-    );
-  } catch (e) {
-    console.error("Send API error:", e?.response?.data || e.message);
-  }
-}
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    return callSendAPI
