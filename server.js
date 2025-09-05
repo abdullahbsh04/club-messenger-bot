@@ -2,7 +2,7 @@
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const request = require('request');
+const axios = require('axios');   // ✅ استبدلنا request بـ axios
 require('dotenv').config();
 
 const app = express().use(bodyParser.json());
@@ -118,10 +118,9 @@ function handleQuickReply(sender_psid, payload) {
 
     case "END_CHAT":
       sendRestartOption(sender_psid);
-      return; // ما نعرض القائمة مرة ثانية بعد الإنهاء
+      return;
   }
 
-  // عرض القائمة مرة ثانية بعد أي رد
   sendQuickReplies(sender_psid);
 }
 
@@ -157,25 +156,20 @@ function sendRestartOption(sender_psid) {
   callSendAPI(sender_psid, response);
 }
 
-// إرسال عبر Facebook API
-function callSendAPI(sender_psid, response) {
-  let request_body = {
-    recipient: { id: sender_psid },
-    message: response
-  };
-
-  request({
-    uri: "https://graph.facebook.com/v12.0/me/messages",
-    qs: { access_token: PAGE_ACCESS_TOKEN },
-    method: "POST",
-    json: request_body
-  }, (err, res, body) => {
-    if (!err) {
-      console.log('Message sent!');
-    } else {
-      console.error("Unable to send message:" + err);
-    }
-  });
+// إرسال عبر Facebook API باستخدام axios
+async function callSendAPI(sender_psid, response) {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v12.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        recipient: { id: sender_psid },
+        message: response
+      }
+    );
+    console.log('Message sent!');
+  } catch (err) {
+    console.error("Unable to send message:", err.response ? err.response.data : err.message);
+  }
 }
 
 // تشغيل السيرفر
