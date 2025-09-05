@@ -1,248 +1,182 @@
-/**
- * Simple Messenger Bot for a university club
- * - Supports webhook verification
- * - Handles messages & postbacks
- * - Sends quick menu with links (about, contact, payment groups, course groups, study plan, course map)
- *
- * Fill your links in the LINKS and COURSES objects below.
- * Set Secrets/Env Vars: PAGE_ACCESS_TOKEN, VERIFY_TOKEN
- */
+'use strict';
 
-const express = require("express");
-const bodyParser = require("body-parser");
-const axios = require("axios");
+const express = require('express');
+const bodyParser = require('body-parser');
+const request = require('request');
+require('dotenv').config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
+const app = express().use(bodyParser.json());
+const PORT = process.env.PORT || 1337;
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "change_me_verify_token";
 
-if (!PAGE_ACCESS_TOKEN) {
-  console.warn("⚠️ Missing PAGE_ACCESS_TOKEN env var!");
-}
-
-// ====== EDIT THESE LINKS ======
-const LINKS = {
-  CLUB_PAGE: "https://facebook.com/YourClubPageUsername",
-  ABOUT_TEXT: "abdullah",
-  ABOUT_VIDEO: "https://youtu.be/your_intro_video",
-  PAY_GROUPS: [
-    { title: "مجموعة الدفع 2024/2025", url: "https://m.me/j/EXAMPLE1" },
-    { title: "مجموعة الدفع 2025/2026", url: "https://m.me/j/EXAMPLE2" }
-  ],
-  COURSE_GROUPS: [
-    { title: "مجموعة مساق مادة 1", url: "https://m.me/j/COURSE1" },
-    { title: "مجموعة مساق مادة 2", url: "https://m.me/j/COURSE2" }
-  ],
-  STUDY_PLAN: "https://drive.google.com/your_plan_link",
-  COURSE_MAP_DRIVE: "https://drive.google.com/your_course_map_link"
-};
-
-// Map course names to Drive links
-const COURSES = {
-  "مادة 1": "https://drive.google.com/drive/folders/EXAMPLE_C1",
-  "مادة 2": "https://drive.google.com/drive/folders/EXAMPLE_C2",
-  "مادة 3": "https://drive.google.com/drive/folders/EXAMPLE_C3"
-};
-
-// ====== WEBHOOK VERIFY (GET) ======
-app.get("/webhook", (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
+// webhook للتحقق
+app.get('/webhook', (req, res) => {
+  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+  let mode = req.query['hub.mode'];
+  let token = req.query['hub.verify_token'];
+  let challenge = req.query['hub.challenge'];
 
   if (mode && token) {
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("✅ Webhook verified.");
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('WEBHOOK_VERIFIED');
       res.status(200).send(challenge);
     } else {
-      console.log("❌ Verify token mismatch.");
       res.sendStatus(403);
     }
-  } else {
-    res.sendStatus(400);
   }
 });
 
-// ====== WEBHOOK RECEIVE (POST) ======
-app.post("/webhook", (req, res) => {
-  const body = req.body;
+// webhook لاستقبال الرسائل
+app.post('/webhook', (req, res) => {
+  let body = req.body;
 
-  if (body.object === "page") {
-    body.entry.forEach(entry => {
-      const webhookEvent = entry.messaging && entry.messaging[0];
-      if (!webhookEvent) return;
+  if (body.object === 'page') {
+    body.entry.forEach(function(entry) {
+      let webhook_event = entry.messaging[0];
+      let sender_psid = webhook_event.sender.id;
 
-      const sender_psid = webhookEvent.sender && webhookEvent.sender.id;
-      if (!sender_psid) return;
-
-      if (webhookEvent.message) {
-        handleMessage(sender_psid, webhookEvent.message);
-      } else if (webhookEvent.postback) {
-        handlePostback(sender_psid, webhookEvent.postback);
+      if (webhook_event.message) {
+        handleMessage(sender_psid, webhook_event.message);
+      } else if (webhook_event.postback) {
+        handlePostback(sender_psid, webhook_event.postback);
       }
     });
-
-    res.status(200).send("EVENT_RECEIVED");
+    res.status(200).send('EVENT_RECEIVED');
   } else {
     res.sendStatus(404);
   }
 });
 
-// ====== BASIC ROUTES ======
-app.get("/", (req, res) => {
-  res.send("Messenger bot is running ✅");
-});
-
-// Optional: setup Get Started + persistent menu
-app.get("/setup", async (req, res) => {
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v19.0/me/messenger_profile?access_token=${PAGE_ACCESS_TOKEN}`,
-      {
-        get_started: { payload: "GET_STARTED" },
-        greeting: [{
-          locale: "default",
-          text: "أهلاً بك في بوت نادي التخصص 👋"
-        }],
-        persistent_menu: [{
-          locale: "default",
-          composer_input_disabled: false,
-          call_to_actions: [
-            { type: "postback", title: "النبذة والفيديو", payload: "ABOUT" },
-            { type: "postback", title: "التواصل مع النادي", payload: "CONTACT" },
-            { type: "postback", title: "الخطة الدراسية", payload: "PLAN" },
-            { type: "postback", title: "مجموعات الدفع", payload: "PAY_GROUPS" },
-            { type: "postback", title: "مجموعات المواد", payload: "COURSE_GROUPS" }
-          ]
-        }]
-      }
-    );
-    res.send("Setup done ✅ (get_started + menu)");
-  } catch (e) {
-    console.error(e?.response?.data || e.message);
-    res.status(500).send("Setup failed ❌");
+// استقبال أي رسالة
+function handleMessage(sender_psid, received_message) {
+  if (received_message.quick_reply) {
+    let payload = received_message.quick_reply.payload;
+    handleQuickReply(sender_psid, payload);
+  } else {
+    // أول رسالة أو أي نص عشوائي → نعرض الترحيب + القائمة
+    startConversation(sender_psid);
   }
-});
-
-// ====== HELPERS ======
-function mainMenuQuickReplies() {
-  const qrs = [
-    { content_type: "text", title: "النبذة", payload: "ABOUT" },
-    { content_type: "text", title: "التواصل", payload: "CONTACT" },
-    { content_type: "text", title: "الخطة", payload: "PLAN" },
-    { content_type: "text", title: "مجاميع الدفع", payload: "PAY_GROUPS" },
-    { content_type: "text", title: "مجاميع المواد", payload: "COURSE_GROUPS" },
-    { content_type: "text", title: "خريطة المواد", payload: "COURSE_MAP" }
-  ];
-  return {
-    text: "شو بتحب تختار؟",
-    quick_replies: qrs
-  };
 }
 
-async function handleMessage(sender_psid, received_message) {
-  if (received_message.quick_reply && received_message.quick_reply.payload) {
-    return handlePayload(sender_psid, received_message.quick_reply.payload);
-  }
-
-  const text = (received_message.text || "").trim();
-  if (!text) {
-    return callSendAPI(sender_psid, { text: "ابعثلي كلمة 'قائمة' لعرض الخيارات 👇" });
-  }
-
-  // simple keywords
-  const norm = text.replace(/\s+/g, "").toLowerCase();
-  if (["help","menu","قائمة","خيارات"].some(k => norm.includes(k))) {
-    return callSendAPI(sender_psid, mainMenuQuickReplies());
-  }
-  if (norm.includes("نبذة") || norm.includes("تعريف")) {
-    return sendAbout(sender_psid);
-  }
-  if (norm.includes("تواصل") || norm.includes("ادارة")) {
-    return sendContact(sender_psid);
-  }
-  if (norm.includes("خطة")) {
-    return sendPlan(sender_psid);
-  }
-  if (norm.includes("مجاميع") || norm.includes("مجموعة") || norm.includes("جروبات")) {
-    return sendGroups(sender_psid);
-  }
-  if (norm.includes("خريطة") || norm.includes("مواد")) {
-    // If the user typed a course name exactly
-    if (COURSES[text]) {
-      return callSendAPI(sender_psid, { text: `رابط ${text}: ${COURSES[text]}` });
-    }
-    // Otherwise show course list
-    return sendCourses(sender_psid);
-  }
-
-  // Try exact match with a course name
-  if (COURSES[text]) {
-    return callSendAPI(sender_psid, { text: `رابط ${text}: ${COURSES[text]}` });
-  }
-
-  // Fallback: show menu
-  await callSendAPI(sender_psid, { text: "ما فهمت طلبك 🙂" });
-  return callSendAPI(sender_psid, mainMenuQuickReplies());
+// بدء المحادثة (ترحيب + قائمة)
+function startConversation(sender_psid) {
+  sendTextMessage(sender_psid, "مرحبا بك في نادي هندسة الأتمتة الصناعية، نحن هنا لمساعدتك ✅");
+  sendQuickReplies(sender_psid);
 }
 
-function handlePostback(sender_psid, postback) {
-  const payload = postback.payload || "";
-  return handlePayload(sender_psid, payload);
-}
-
-async function handlePayload(sender_psid, payload) {
+// التعامل مع اختيارات القائمة
+function handleQuickReply(sender_psid, payload) {
   switch (payload) {
-    case "GET_STARTED":
-      await callSendAPI(sender_psid, { text: "أهلاً بك في نادي هندسة الأتمتة الصناعية نحن هنا لمساعدتك" });
-      return callSendAPI(sender_psid, mainMenuQuickReplies());
-    case "ABOUT": return sendAbout(sender_psid);
-    case "CONTACT": return sendContact(sender_psid);
-    case "PLAN": return sendPlan(sender_psid);
-    case "PAY_GROUPS": return sendPayGroups(sender_psid);
-    case "COURSE_GROUPS": return sendCourseGroups(sender_psid);
-    case "COURSE_MAP": return callSendAPI(sender_psid, { text: `خريطة المواد: ${LINKS.COURSE_MAP_DRIVE}` });
-    default:
-      // if payload is "COURSE::<name>"
-      if (payload.startsWith("COURSE::")) {
-        const name = payload.split("COURSE::")[1];
-        const url = COURSES[name];
-        if (url) return callSendAPI(sender_psid, { text: `رابط ${name}: ${url}` });
-      }
-      return callSendAPI(sender_psid, mainMenuQuickReplies());
+    case "ABOUT_MAJOR":
+      sendTextMessage(sender_psid,
+        "📘 هذا رابط منشور تعريفي عن التخصص:\nhttps://www.facebook.com/share/v/19nZQ7Etds/"
+      );
+      break;
+
+    case "STUDENTS_GROUPS":
+      sendTextMessage(sender_psid,
+        "🌐 جروبات طلاب التخصص:\n\n" +
+        "- جروب جميع الطلاب: https://m.me/j/AbYTm4WbUD1GUfkz/\n" +
+        "- دفعة 2025: https://m.me/j/AbY-p17kgtwvmi8D/\n" +
+        "- دفعة 2024: https://m.me/j/AbbY1wf4m4GDfpe2/\n" +
+        "- دفعة 2023: https://m.me/j/Abb4PoBpSRmHnWqa/\n" +
+        "- دفعة 2022: https://m.me/j/AbZs3IuWv_8G-VGE/\n" +
+        "- دفعة 2021: https://m.me/j/AbaZlfepk-mtpq6d/"
+      );
+      break;
+
+    case "COURSES_GROUPS":
+      sendTextMessage(sender_psid,
+        "📚 جروبات المواد والمختبرات:\n\n" +
+        "- المنطق الرقمي والالكترونيات الرقمية (ديجيتال): https://m.me/j/AbaWDr2ogRBe7pNi/\n" +
+        "- أجهزة الحماية والتحكم (بروتكشن): https://m.me/j/AbblC3cFGyEbT1p_/\n" +
+        "- إلكترونيات عامة: https://m.me/j/AbaLaKU-x5-fOnNg/\n" +
+        "- تصميم الدوائر المنطقية (ديجيتال): https://m.me/j/AbYNnYVJXmiaUgjb/\n" +
+        "- متحكمات دقيقة (مايكرو): https://m.me/j/Aba8C2Sg65ch-zHT/\n" +
+        "- برمجة أنظمة التحكم المنطقي والشبكات: https://m.me/j/Abbowta-WUd4Pue1/\n" +
+        "- قيادة محركات التيار المستمر (DC): https://m.me/j/AbZmqdPEoQXA_1Nx/\n" +
+        "- التحكم المنطقي المبرمج 2 (PLC 2): https://m.me/j/Abbzz8HTZx-IPfVS/\n" +
+        "- قيادة محركات التيار المتردد (AC): https://m.me/j/AbYiAbjvhG6RsoP3/\n" +
+        "- أنظمة التحكم المبرمج (PLC): https://m.me/j/AbZJw_wmpliZAaf5/\n" +
+        "- التوافق الكهرومغناطيسي: https://m.me/j/AbaaA_XxYZmGU_sj/\n" +
+        "- أنظمة الإشراف: https://m.me/j/AbalqJf2M7tolHl4/\n\n" +
+        "🔬 مختبرات:\n" +
+        "- مختبر المنطق الرقمي: https://m.me/j/AbaOWxgeP7BPoo4Q/\n" +
+        "- مختبر الحماية والتحكم: https://m.me/j/AbZCBC-VCNqt5xnL/\n" +
+        "- مختبر إلكترونيات: https://m.me/j/Abbon3AdqI0aLbud/\n" +
+        "- مختبر تصميم الدوائر: https://m.me/j/AbYoRtwM9jczPxgG/\n" +
+        "- مختبر مايكرو: https://m.me/j/AbYj_B6DTVrKgPz6/\n" +
+        "- مختبر PLC 2: https://m.me/j/Aba3iFGCW8Ef65b5/\n" +
+        "- مختبر القيادة الكهربائية: https://m.me/j/AbaMAGzusNeLtszk/\n" +
+        "- مختبر PLC: https://m.me/j/AbY6Dn-S1dUDrjGG/"
+      );
+      break;
+
+    case "CLUB_LIBRARY":
+      sendTextMessage(sender_psid, "📖 مكتبة النادي (سيتم إضافتها لاحقًا).");
+      break;
+
+    case "END_CHAT":
+      sendRestartOption(sender_psid);
+      return; // ما نعرض القائمة مرة ثانية بعد الإنهاء
   }
+
+  // عرض القائمة مرة ثانية بعد أي رد
+  sendQuickReplies(sender_psid);
 }
 
-// ----- send helpers -----
-async function sendAbout(sender_psid) {
-  await callSendAPI(sender_psid, { text: LINKS.ABOUT_TEXT });
-  if (LINKS.ABOUT_VIDEO) {
-    return callSendAPI(sender_psid, { text: `فيديو تعريفي: ${LINKS.ABOUT_VIDEO}` });
-  }
+// دالة إرسال نص
+function sendTextMessage(sender_psid, text) {
+  let response = { text: text };
+  callSendAPI(sender_psid, response);
 }
 
-function sendContact(sender_psid) {
-  return callSendAPI(sender_psid, { text: `تواصل مع إدارة النادي:\n${LINKS.CLUB_PAGE}` });
+// دالة إرسال القائمة العمودية
+function sendQuickReplies(sender_psid) {
+  let response = {
+    "text": "اختر من القائمة:",
+    "quick_replies": [
+      { "content_type": "text", "title": "ما هو التخصص ؟", "payload": "ABOUT_MAJOR" },
+      { "content_type": "text", "title": "جروبات طلاب التخصص", "payload": "STUDENTS_GROUPS" },
+      { "content_type": "text", "title": "جروبات المواد والمختبرات", "payload": "COURSES_GROUPS" },
+      { "content_type": "text", "title": "مكتبة النادي", "payload": "CLUB_LIBRARY" },
+      { "content_type": "text", "title": "إنهاء", "payload": "END_CHAT" }
+    ]
+  };
+  callSendAPI(sender_psid, response);
 }
 
-function sendPlan(sender_psid) {
-  return callSendAPI(sender_psid, { text: `الخطة الدراسية: ${LINKS.STUDY_PLAN}` });
+// دالة إرسال خيار إعادة البدء
+function sendRestartOption(sender_psid) {
+  let response = {
+    "text": "✨ انتهت المحادثة، أهلا بكم في أي وقت ❤️",
+    "quick_replies": [
+      { "content_type": "text", "title": "🔄 إعادة البدء", "payload": "RESTART_CHAT" }
+    ]
+  };
+  callSendAPI(sender_psid, response);
 }
 
-async function sendPayGroups(sender_psid) {
-  if (!LINKS.PAY_GROUPS || LINKS.PAY_GROUPS.length === 0) {
-    return callSendAPI(sender_psid, { text: "لا توجد مجموعات دفع حالياً." });
-  }
-  for (const g of LINKS.PAY_GROUPS) {
-    await callSendAPI(sender_psid, { text: `${g.title}: ${g.url}` });
-  }
+// إرسال عبر Facebook API
+function callSendAPI(sender_psid, response) {
+  let request_body = {
+    recipient: { id: sender_psid },
+    message: response
+  };
+
+  request({
+    uri: "https://graph.facebook.com/v12.0/me/messages",
+    qs: { access_token: PAGE_ACCESS_TOKEN },
+    method: "POST",
+    json: request_body
+  }, (err, res, body) => {
+    if (!err) {
+      console.log('Message sent!');
+    } else {
+      console.error("Unable to send message:" + err);
+    }
+  });
 }
 
-async function sendCourseGroups(sender_psid) {
-  if (!LINKS.COURSE_GROUPS || LINKS.COURSE_GROUPS.length === 0) {
-    return callSendAPI
+// تشغيل السيرفر
+app.listen(PORT, () => console.log(`Webhook is listening on port ${PORT}`));
