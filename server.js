@@ -116,6 +116,18 @@ function handleQuickReply(sender_psid, payload) {
       sendStudyPlans(sender_psid);
       return;
 
+    case "STUDY_PLAN_LINK":
+      sendTextMessage(sender_psid,
+        "🔗 الخطة الدراسية:\nhttps://ptuk.edu.ps/ar/academic-programs/study-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
+      );
+      break;
+
+    case "ADVISING_PLAN_LINK":
+      sendTextMessage(sender_psid,
+        "🔗 الخطة الإرشادية:\nhttps://ptuk.edu.ps/ar/academic-programs/advising-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
+      );
+      break;
+
     case "CLUB_LIBRARY":
       sendTextMessage(sender_psid, "📖 مكتبة النادي (سيتم إضافتها لاحقًا).");
       break;
@@ -165,33 +177,6 @@ function sendStudyPlans(sender_psid) {
     ]
   };
   callSendAPI(sender_psid, response);
-}
-
-// معالجة روابط الخطط
-function handleQuickReply(sender_psid, payload) {
-  switch (payload) {
-    case "STUDY_PLAN_LINK":
-      sendTextMessage(sender_psid,
-        "🔗 الخطة الدراسية:\nhttps://ptuk.edu.ps/ar/academic-programs/study-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
-      );
-      break;
-
-    case "ADVISING_PLAN_LINK":
-      sendTextMessage(sender_psid,
-        "🔗 الخطة الإرشادية:\nhttps://ptuk.edu.ps/ar/academic-programs/advising-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
-      );
-      break;
-
-    default:
-      // باقي الباي لودات تظل زي ما هي فوق
-      handleQuickReplyDefault(sender_psid, payload);
-      return;
-  }
-  sendQuickReplies(sender_psid);
-}
-
-function handleQuickReplyDefault(sender_psid, payload) {
-  // نفس switch تبعت الخيارات الأساسية
 }
 
 // دالة إرسال خيار إعادة البدء
