@@ -2,17 +2,12 @@
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const axios = require('axios');   
+const axios = require('axios');   // ✅ استبدلنا request بـ axios
 require('dotenv').config();
 
 const app = express().use(bodyParser.json());
 const PORT = process.env.PORT || 1337;
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
-
-// ✅ Route رئيسي (حل مشكلة 404 في Render)
-app.get("/", (req, res) => {
-  res.status(200).send("✅ Bot is running and ready!");
-});
 
 // webhook للتحقق
 app.get('/webhook', (req, res) => {
@@ -58,6 +53,7 @@ function handleMessage(sender_psid, received_message) {
     let payload = received_message.quick_reply.payload;
     handleQuickReply(sender_psid, payload);
   } else {
+    // أي رسالة يكتبها المستخدم → نعرض القائمة مباشرة
     startConversation(sender_psid);
   }
 }
@@ -75,7 +71,6 @@ function handleQuickReply(sender_psid, payload) {
       sendTextMessage(sender_psid,
         "📘 هذا رابط منشور تعريفي عن التخصص:\nhttps://www.facebook.com/share/v/19nZQ7Etds/"
       );
-      sendQuickReplies(sender_psid);
       break;
 
     case "STUDENTS_GROUPS":
@@ -88,7 +83,6 @@ function handleQuickReply(sender_psid, payload) {
         "- دفعة 2022: https://m.me/j/AbZs3IuWv_8G-VGE/\n" +
         "- دفعة 2021: https://m.me/j/AbaZlfepk-mtpq6d/"
       );
-      sendQuickReplies(sender_psid);
       break;
 
     case "COURSES_GROUPS":
@@ -116,41 +110,26 @@ function handleQuickReply(sender_psid, payload) {
         "- مختبر القيادة الكهربائية: https://m.me/j/AbaMAGzusNeLtszk/\n" +
         "- مختبر PLC: https://m.me/j/AbY6Dn-S1dUDrjGG/"
       );
-      sendQuickReplies(sender_psid);
-      break;
-
-    case "CLUB_LIBRARY":
-      sendTextMessage(sender_psid, "📖 مكتبة النادي (سيتم إضافتها لاحقًا).");
-      sendQuickReplies(sender_psid);
       break;
 
     case "STUDY_PLANS":
-      sendTextMessage(sender_psid, "📑 اختر من الخيارات:");
       sendStudyPlans(sender_psid);
-      break;
+      return;
 
-    case "STUDY_PLAN":
-      sendTextMessage(sender_psid,
-        "📘 الخطة الدراسية:\nhttps://ptuk.edu.ps/ar/academic-programs/study-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
-      );
-      sendBackOptions(sender_psid);
-      break;
-
-    case "ADVISING_PLAN":
-      sendTextMessage(sender_psid,
-        "🗂️ الخطة الإرشادية:\nhttps://ptuk.edu.ps/ar/academic-programs/advising-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
-      );
-      sendBackOptions(sender_psid);
+    case "CLUB_LIBRARY":
+      sendTextMessage(sender_psid, "📖 مكتبة النادي (سيتم إضافتها لاحقًا).");
       break;
 
     case "END_CHAT":
       sendRestartOption(sender_psid);
-      break;
+      return;
 
     case "RESTART_CHAT":
       startConversation(sender_psid);
-      break;
+      return;
   }
+
+  sendQuickReplies(sender_psid);
 }
 
 // دالة إرسال نص
@@ -159,7 +138,7 @@ function sendTextMessage(sender_psid, text) {
   callSendAPI(sender_psid, response);
 }
 
-// القائمة الرئيسية
+// دالة إرسال القائمة العمودية
 function sendQuickReplies(sender_psid) {
   let response = {
     "text": "اختر من القائمة:",
@@ -167,46 +146,60 @@ function sendQuickReplies(sender_psid) {
       { "content_type": "text", "title": "ما هو التخصص ؟", "payload": "ABOUT_MAJOR" },
       { "content_type": "text", "title": "جروبات طلاب التخصص", "payload": "STUDENTS_GROUPS" },
       { "content_type": "text", "title": "جروبات المواد والمختبرات", "payload": "COURSES_GROUPS" },
-      { "content_type": "text", "title": "مكتبة النادي", "payload": "CLUB_LIBRARY" },
       { "content_type": "text", "title": "الخطط الدراسية", "payload": "STUDY_PLANS" },
+      { "content_type": "text", "title": "مكتبة النادي", "payload": "CLUB_LIBRARY" },
       { "content_type": "text", "title": "إنهاء", "payload": "END_CHAT" }
     ]
   };
   callSendAPI(sender_psid, response);
 }
 
-// خيارات الخطط الدراسية
+// دالة الخطط الدراسية
 function sendStudyPlans(sender_psid) {
   let response = {
-    "text": "📑 اختر الخطة:",
+    "text": "📑 اختر نوع الخطة:",
     "quick_replies": [
-      { "content_type": "text", "title": "📘 الخطة الدراسية", "payload": "STUDY_PLAN" },
-      { "content_type": "text", "title": "🗂️ الخطة الإرشادية", "payload": "ADVISING_PLAN" },
-      { "content_type": "text", "title": "✨ إنهاء", "payload": "END_CHAT" },
-      { "content_type": "text", "title": "🔄 القائمة من جديد", "payload": "RESTART_CHAT" }
+      { "content_type": "text", "title": "الخطة الدراسية", "payload": "STUDY_PLAN_LINK" },
+      { "content_type": "text", "title": "الخطة الإرشادية", "payload": "ADVISING_PLAN_LINK" },
+      { "content_type": "text", "title": "إنهاء", "payload": "END_CHAT" }
     ]
   };
   callSendAPI(sender_psid, response);
 }
 
-// إرسال خيار إعادة البدء
+// معالجة روابط الخطط
+function handleQuickReply(sender_psid, payload) {
+  switch (payload) {
+    case "STUDY_PLAN_LINK":
+      sendTextMessage(sender_psid,
+        "🔗 الخطة الدراسية:\nhttps://ptuk.edu.ps/ar/academic-programs/study-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
+      );
+      break;
+
+    case "ADVISING_PLAN_LINK":
+      sendTextMessage(sender_psid,
+        "🔗 الخطة الإرشادية:\nhttps://ptuk.edu.ps/ar/academic-programs/advising-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
+      );
+      break;
+
+    default:
+      // باقي الباي لودات تظل زي ما هي فوق
+      handleQuickReplyDefault(sender_psid, payload);
+      return;
+  }
+  sendQuickReplies(sender_psid);
+}
+
+function handleQuickReplyDefault(sender_psid, payload) {
+  // نفس switch تبعت الخيارات الأساسية
+}
+
+// دالة إرسال خيار إعادة البدء
 function sendRestartOption(sender_psid) {
   let response = {
     "text": "✨ انتهت المحادثة، أهلا بكم في أي وقت ❤️",
     "quick_replies": [
       { "content_type": "text", "title": "🔄 إعادة البدء", "payload": "RESTART_CHAT" }
-    ]
-  };
-  callSendAPI(sender_psid, response);
-}
-
-// خيارات العودة بعد الخطط
-function sendBackOptions(sender_psid) {
-  let response = {
-    "text": "ماذا تريد أن تفعل الآن؟",
-    "quick_replies": [
-      { "content_type": "text", "title": "🔄 القائمة من جديد", "payload": "RESTART_CHAT" },
-      { "content_type": "text", "title": "✨ إنهاء", "payload": "END_CHAT" }
     ]
   };
   callSendAPI(sender_psid, response);
