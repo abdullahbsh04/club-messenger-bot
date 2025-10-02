@@ -122,9 +122,21 @@ function handleQuickReply(sender_psid, payload) {
       );
       break;
 
+    // ✅ تعديل الخطة الإرشادية → بدل الرابط مباشرة، نظهر اختيار دفعة
     case "ADVISING_PLAN_LINK":
+      sendAdvisingBatchOptions(sender_psid);
+      return;
+
+    // ✅ دفعات الخطة الإرشادية
+    case "ADVISING_2022":
       sendTextMessage(sender_psid,
-        "🔗 الخطة الإرشادية:\nhttps://ptuk.edu.ps/ar/academic-programs/advising-plan.php?name=bachelor-of-electrical-eng-industrial-automation"
+        "🔗 رابط الخطة (2022 وما قبل):\nhttps://drive.google.com/file/d/1HeeX4WD3z9Rop7cXXZiqYBPXpGnlHeBS/view?usp=sharing"
+      );
+      break;
+
+    case "ADVISING_2023":
+      sendTextMessage(sender_psid,
+        "🔗 رابط الخطة (2023 وما بعد):\nhttps://drive.google.com/file/d/1wQE4EmRy_HLC_U1yopyfU172Lk6Pk4id/view?usp=sharing"
       );
       break;
 
@@ -174,6 +186,19 @@ function sendStudyPlans(sender_psid) {
       { "content_type": "text", "title": "الخطة الدراسية", "payload": "STUDY_PLAN_LINK" },
       { "content_type": "text", "title": "الخطة الإرشادية", "payload": "ADVISING_PLAN_LINK" },
       { "content_type": "text", "title": "إنهاء", "payload": "END_CHAT" }
+    ]
+  };
+  callSendAPI(sender_psid, response);
+}
+
+// ✅ دالة جديدة لاختيار دفعة الخطة الإرشادية
+function sendAdvisingBatchOptions(sender_psid) {
+  let response = {
+    "text": "📑 اختر دفعتك:",
+    "quick_replies": [
+      { "content_type": "text", "title": "2022 وما قبل", "payload": "ADVISING_2022" },
+      { "content_type": "text", "title": "2023 وما بعد", "payload": "ADVISING_2023" },
+      { "content_type": "text", "title": "⬅️ رجوع", "payload": "STUDY_PLANS" }
     ]
   };
   callSendAPI(sender_psid, response);
